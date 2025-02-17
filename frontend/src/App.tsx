@@ -30,7 +30,6 @@ function App() {
         headers: {
           "Content-Type": "application/json",
         },
-        mode: "cors",
       })
       if (response.ok) {
         const data = await response.json()
@@ -52,7 +51,6 @@ function App() {
         headers: {
           "Content-Type": "application/json",
         },
-        mode: "cors",
         body: JSON.stringify(newProduct)
       })
       if (response.ok) {
