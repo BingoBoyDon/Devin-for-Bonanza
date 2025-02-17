@@ -6,13 +6,17 @@ from fastapi.responses import JSONResponse
 
 app = FastAPI(title="Sistema de Inventario")
 
-@app.middleware("http")
-async def cors_middleware(request, call_next):
-    response = await call_next(request)
-    response.headers["Access-Control-Allow-Origin"] = "https://test-app-nj243y1q.devinapps.com"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "*"
-    return response
+origins = ["https://test-app-nj243y1q.devinapps.com"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,
+)
 
 class Product(BaseModel):
     name: str
@@ -22,13 +26,14 @@ class Product(BaseModel):
 inventory: Dict[int, Product] = {}
 
 @app.options("/{path:path}")
-async def options_route(path: str):
+async def preflight_handler(path: str):
     return JSONResponse(
         content={},
         headers={
             "Access-Control-Allow-Origin": "https://test-app-nj243y1q.devinapps.com",
             "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
             "Access-Control-Allow-Headers": "*",
+            "Access-Control-Max-Age": "3600",
         },
     )
 
