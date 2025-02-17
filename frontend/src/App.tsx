@@ -28,8 +28,10 @@ function App() {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/products/`, {
         method: "GET",
         headers: {
+          "Accept": "application/json",
           "Content-Type": "application/json",
         },
+        mode: "cors",
       })
       if (response.ok) {
         const data = await response.json()
@@ -49,8 +51,10 @@ function App() {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/products/`, {
         method: "POST",
         headers: {
+          "Accept": "application/json",
           "Content-Type": "application/json",
         },
+        mode: "cors",
         body: JSON.stringify(newProduct)
       })
       if (response.ok) {
