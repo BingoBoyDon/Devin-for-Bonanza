@@ -26,7 +26,7 @@ function App() {
   })
 
   const fetchProducts = async () => {
-    const response = await fetch('http://localhost:8000/products/')
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/products/`)
     const data = await response.json()
     setProducts(data)
   }
@@ -37,7 +37,7 @@ function App() {
 
   const handleAddProduct = async () => {
     try {
-      const response = await fetch('http://localhost:8000/products/', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/products/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newProduct)
@@ -63,7 +63,7 @@ function App() {
   const handleEditProduct = async () => {
     if (!currentProduct) return
     try {
-      const response = await fetch(`http://localhost:8000/products/${currentProduct.id}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/products/${currentProduct.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(currentProduct.product)
@@ -88,7 +88,7 @@ function App() {
 
   const handleDeleteProduct = async (id: string) => {
     try {
-      const response = await fetch(`http://localhost:8000/products/${id}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/products/${id}`, {
         method: 'DELETE'
       })
       if (response.ok) {
