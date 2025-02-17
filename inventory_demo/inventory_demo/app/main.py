@@ -8,22 +8,20 @@ app = FastAPI(title="Sistema de Inventario")
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "https://test-app-nj243y1q.devinapps.com"],
+    allow_origins=["*"],  # Temporarily allow all origins for testing
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Modelo de datos para productos
 class Product(BaseModel):
     name: str
     quantity: int
     description: Optional[str] = None
 
-# Almacenamiento en memoria
 inventory: Dict[int, Product] = {}
 
-@app.post("/products/", response_model=Product)
+@app.post("/products/")
 def create_product(product: Product):
     product_id = len(inventory) + 1
     inventory[product_id] = product
