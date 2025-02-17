@@ -5,13 +5,15 @@ from typing import Dict, Optional
 
 app = FastAPI(title="Sistema de Inventario")
 
-# Configure CORS
+# Configure CORS with all required headers
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://test-app-nj243y1q.devinapps.com"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600
 )
 
 class Product(BaseModel):
