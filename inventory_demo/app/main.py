@@ -8,10 +8,10 @@ app = FastAPI(title="Sistema de Inventario")
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origins=["https://test-app-nj243y1q.devinapps.com"],
+    allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"]
 )
 
 # Modelo de datos para productos
