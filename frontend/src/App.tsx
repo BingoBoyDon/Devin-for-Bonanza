@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "./components/ui/button"
 import { Input } from "./components/ui/input"
@@ -20,15 +20,27 @@ function App() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [currentProduct, setCurrentProduct] = useState<{id: string, product: Product} | null>(null)
   const [newProduct, setNewProduct] = useState<Product>({
-    name: '',
+    name: "",
     quantity: 0,
-    description: ''
+    description: ""
   })
 
   const fetchProducts = async () => {
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/products/`)
-    const data = await response.json()
-    setProducts(data)
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/products/`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        mode: "cors",
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setProducts(data)
+      }
+    } catch (error) {
+      console.error("Error fetching products:", error)
+    }
   }
 
   useEffect(() => {
@@ -38,8 +50,11 @@ function App() {
   const handleAddProduct = async () => {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/products/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        mode: "cors",
         body: JSON.stringify(newProduct)
       })
       if (response.ok) {
@@ -48,60 +63,13 @@ function App() {
           description: "Producto agregado correctamente",
         })
         setIsAddDialogOpen(false)
-        setNewProduct({ name: '', quantity: 0, description: '' })
+        setNewProduct({ name: "", quantity: 0, description: "" })
         fetchProducts()
       }
     } catch (error) {
       toast({
         title: "Error",
         description: "No se pudo agregar el producto",
-        variant: "destructive"
-      })
-    }
-  }
-
-  const handleEditProduct = async () => {
-    if (!currentProduct) return
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/products/${currentProduct.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(currentProduct.product)
-      })
-      if (response.ok) {
-        toast({
-          title: "Éxito",
-          description: "Producto actualizado correctamente",
-        })
-        setIsEditDialogOpen(false)
-        setCurrentProduct(null)
-        fetchProducts()
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo actualizar el producto",
-        variant: "destructive"
-      })
-    }
-  }
-
-  const handleDeleteProduct = async (id: string) => {
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/products/${id}`, {
-        method: 'DELETE'
-      })
-      if (response.ok) {
-        toast({
-          title: "Éxito",
-          description: "Producto eliminado correctamente",
-        })
-        fetchProducts()
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar el producto",
         variant: "destructive"
       })
     }
@@ -172,57 +140,12 @@ function App() {
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handleDeleteProduct(id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
                 </div>
               </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
-
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Editar Producto</DialogTitle>
-          </DialogHeader>
-          {currentProduct && (
-            <div className="grid gap-4 py-4">
-              <Input
-                placeholder="Nombre del producto"
-                value={currentProduct.product.name}
-                onChange={(e) => setCurrentProduct({
-                  ...currentProduct,
-                  product: { ...currentProduct.product, name: e.target.value }
-                })}
-              />
-              <Input
-                type="number"
-                placeholder="Cantidad"
-                value={currentProduct.product.quantity}
-                onChange={(e) => setCurrentProduct({
-                  ...currentProduct,
-                  product: { ...currentProduct.product, quantity: parseInt(e.target.value) }
-                })}
-              />
-              <Input
-                placeholder="Descripción"
-                value={currentProduct.product.description}
-                onChange={(e) => setCurrentProduct({
-                  ...currentProduct,
-                  product: { ...currentProduct.product, description: e.target.value }
-                })}
-              />
-              <Button onClick={handleEditProduct}>Guardar</Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
       <Toaster />
     </div>
   )
