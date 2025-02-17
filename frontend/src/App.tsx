@@ -3,7 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "./components/ui/button"
 import { Input } from "./components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./components/ui/dialog"
-import { Plus, Pencil, Trash2 } from "lucide-react"
+import { Plus, Pencil } from "lucide-react"
 import { useToast } from "./hooks/use-toast"
 import { Toaster } from "./components/ui/toaster"
 
@@ -17,8 +17,6 @@ function App() {
   const { toast } = useToast()
   const [products, setProducts] = useState<Record<string, Product>>({})
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [currentProduct, setCurrentProduct] = useState<{id: string, product: Product} | null>(null)
   const [newProduct, setNewProduct] = useState<Product>({
     name: "",
     quantity: 0,
@@ -133,10 +131,6 @@ function App() {
                   <Button
                     variant="outline"
                     size="icon"
-                    onClick={() => {
-                      setCurrentProduct({ id, product })
-                      setIsEditDialogOpen(true)
-                    }}
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
