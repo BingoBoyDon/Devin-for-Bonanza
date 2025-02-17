@@ -2,20 +2,15 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, Optional
-from fastapi.responses import JSONResponse
 
 app = FastAPI(title="Sistema de Inventario")
 
-origins = ["https://test-app-nj243y1q.devinapps.com"]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"],
-    max_age=3600,
 )
 
 class Product(BaseModel):
@@ -24,18 +19,6 @@ class Product(BaseModel):
     description: Optional[str] = None
 
 inventory: Dict[int, Product] = {}
-
-@app.options("/{path:path}")
-async def preflight_handler(path: str):
-    return JSONResponse(
-        content={},
-        headers={
-            "Access-Control-Allow-Origin": "https://test-app-nj243y1q.devinapps.com",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
-            "Access-Control-Max-Age": "3600",
-        },
-    )
 
 @app.post("/products/")
 def create_product(product: Product):
