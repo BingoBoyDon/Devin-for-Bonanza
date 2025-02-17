@@ -25,7 +25,13 @@ function App() {
 
   const fetchProducts = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/products/`)
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/products/`, {
+        method: "GET",
+        headers: {
+          "Accept": "application/json"
+        },
+        mode: "cors"
+      })
       if (response.ok) {
         const data = await response.json()
         setProducts(data)
@@ -45,7 +51,9 @@ function App() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Accept": "application/json"
         },
+        mode: "cors",
         body: JSON.stringify(newProduct)
       })
       if (response.ok) {
