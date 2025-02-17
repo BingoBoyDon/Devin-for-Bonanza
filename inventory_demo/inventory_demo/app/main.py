@@ -5,12 +5,10 @@ from typing import Dict, Optional
 
 app = FastAPI(title="Sistema de Inventario")
 
-origins = ["https://test-app-nj243y1q.devinapps.com"]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins temporarily for testing
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
