@@ -2,7 +2,7 @@ import { useState, useEffect } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "./components/ui/button"
 import { Input } from "./components/ui/input"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "./components/ui/dialog"
 import { Plus, Pencil } from "lucide-react"
 import { useToast } from "./hooks/use-toast"
 import { Toaster } from "./components/ui/toaster"
@@ -28,9 +28,9 @@ function App() {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/products/`, {
         method: "GET",
         headers: {
-          "Accept": "application/json"
-        },
-        mode: "cors"
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        }
       })
       if (response.ok) {
         const data = await response.json()
@@ -53,7 +53,6 @@ function App() {
           "Content-Type": "application/json",
           "Accept": "application/json"
         },
-        mode: "cors",
         body: JSON.stringify(newProduct)
       })
       if (response.ok) {
@@ -85,9 +84,12 @@ function App() {
               Agregar Producto
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="sm:max-w-[425px]" aria-describedby="dialog-description">
             <DialogHeader>
               <DialogTitle>Agregar Nuevo Producto</DialogTitle>
+              <DialogDescription id="dialog-description">
+                Ingrese los detalles del nuevo producto
+              </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <Input
