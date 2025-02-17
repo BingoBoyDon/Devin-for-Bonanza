@@ -25,14 +25,7 @@ function App() {
 
   const fetchProducts = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/products/`, {
-        method: "GET",
-        headers: {
-          "Accept": "application/json",
-          "Content-Type": "application/json",
-        },
-        mode: "cors",
-      })
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/products/`)
       if (response.ok) {
         const data = await response.json()
         setProducts(data)
@@ -51,10 +44,8 @@ function App() {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/products/`, {
         method: "POST",
         headers: {
-          "Accept": "application/json",
           "Content-Type": "application/json",
         },
-        mode: "cors",
         body: JSON.stringify(newProduct)
       })
       if (response.ok) {
