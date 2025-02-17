@@ -1,18 +1,20 @@
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, Optional
 
 app = FastAPI(title="Sistema de Inventario")
 
-@app.middleware("http")
-async def add_cors_headers(request, call_next):
-    response = await call_next(request)
-    response.headers["Access-Control-Allow-Origin"] = "https://test-app-nj243y1q.devinapps.com"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    response.headers["Access-Control-Allow-Methods"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "*"
-    return response
+# Configure CORS
+origins = ["https://test-app-nj243y1q.devinapps.com"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class Product(BaseModel):
     name: str
@@ -50,7 +52,3 @@ def delete_product(product_id: int):
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     del inventory[product_id]
     return {"message": "Producto eliminado"}
-
-@app.options("/{path:path}")
-async def options_route(path: str):
-    return Response(status_code=200)
