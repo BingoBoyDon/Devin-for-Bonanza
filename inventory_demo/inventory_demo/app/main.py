@@ -1,27 +1,19 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Dict, Optional
 
 app = FastAPI(title="Sistema de Inventario")
 
-# Configure CORS
+origins = ["https://test-app-nj243y1q.devinapps.com"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://test-app-nj243y1q.devinapps.com"],
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type"],
 )
-
-@app.middleware("http")
-async def cors_middleware(request: Request, call_next):
-    response = await call_next(request)
-    response.headers["Access-Control-Allow-Origin"] = "https://test-app-nj243y1q.devinapps.com"
-    response.headers["Access-Control-Allow-Methods"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "*"
-    return response
 
 class Product(BaseModel):
     name: str
