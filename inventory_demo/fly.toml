@@ -20,4 +20,4 @@ app = "inventory-demo-pduriwcg"
   cpus = 1
 
 [processes]
-  app = "./run.sh"
+  app = "poetry run start"

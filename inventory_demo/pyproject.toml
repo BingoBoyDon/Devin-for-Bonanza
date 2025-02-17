@@ -11,6 +11,9 @@ fastapi = "^0.115.8"
 uvicorn = "^0.34.0"
 pydantic = "^2.10.6"
 
+[tool.poetry.scripts]
+start = "uvicorn inventory_demo.app.main:app --host 0.0.0.0 --port 8080"
+
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
