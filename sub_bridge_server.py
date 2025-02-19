@@ -116,13 +116,26 @@ async def connect_to_bridge_server():
 
                 # Mantener la conexión y procesar mensajes
                 try:
-                    async for message in ws:
-                        logger.debug(f"[SUB-BRIDGE] Mensaje recibido: {message}")
-                        await broadcast_message(message)
-                except websockets.exceptions.ConnectionClosed as e:
-                    logger.warning(f"[SUB-BRIDGE] Conexión cerrada: {e}")
+                    while True:
+                        try:
+                            pong_waiter = await ws.ping()
+                            await asyncio.wait_for(pong_waiter, timeout=5)
+                        except Exception as e:
+                            logger.error(f"[SUB-BRIDGE] WebSocket no responde: {e}")
+                            break
+
+                        try:
+                            message = await ws.recv()
+                            logger.debug(f"[SUB-BRIDGE] Mensaje recibido: {message}")
+                            await broadcast_message(message)
+                        except websockets.exceptions.ConnectionClosed as e:
+                            logger.warning(f"[SUB-BRIDGE] Conexión cerrada: {e}")
+                            break
+                        except Exception as e:
+                            logger.error(f"[SUB-BRIDGE] Error procesando mensajes: {e}")
+                            continue
                 except Exception as e:
-                    logger.error(f"[SUB-BRIDGE] Error procesando mensajes: {e}")
+                    logger.error(f"[SUB-BRIDGE] Error en el bucle principal: {e}")
 
         except asyncio.CancelledError:
             logger.warning("[SUB-BRIDGE] Tarea de conexión cancelada.")
@@ -165,23 +178,44 @@ async def broadcast_message(message: str):
     """
     to_remove = set()
     for ws in connected_clients.copy():
-        try:
+        retry_count = 3
+        while retry_count > 0:
             try:
-                pong_waiter = await ws.ping()
-                await asyncio.wait_for(pong_waiter, timeout=5)
-            except Exception as e:
-                logger.warning(f"[SUB-BRIDGE] Cliente {ws.remote_address} no responde: {e}")
+                # Verificar estado del WebSocket antes de enviar
+                try:
+                    pong_waiter = await ws.ping()
+                    await asyncio.wait_for(pong_waiter, timeout=5)
+                except Exception as e:
+                    logger.error(f"[SUB-BRIDGE] Cliente {ws.remote_address} no responde: {e}")
+                    retry_count -= 1
+                    if retry_count > 0:
+                        logger.warning(f"[SUB-BRIDGE] Reintentando envío ({retry_count} intentos restantes)")
+                        await asyncio.sleep(1)
+                        continue
+                    to_remove.add(ws)
+                    break
+
+                await ws.send(message)
+                logger.debug(f"[SUB-BRIDGE] Mensaje enviado a {ws.remote_address}")
+                break
+            except websockets.exceptions.ConnectionClosed as e:
+                logger.error(f"[SUB-BRIDGE] Conexión cerrada al enviar mensaje a {ws.remote_address}: {e}")
+                retry_count -= 1
+                if retry_count > 0:
+                    logger.warning(f"[SUB-BRIDGE] Reintentando envío ({retry_count} intentos restantes)")
+                    await asyncio.sleep(1)
+                    continue
                 to_remove.add(ws)
-                continue
-                
-            await ws.send(message)
-            logger.debug(f"[SUB-BRIDGE] Mensaje enviado a {ws.remote_address}")
-        except websockets.exceptions.ConnectionClosed:
-            logger.warning(f"[SUB-BRIDGE] Conexión cerrada con {ws.remote_address}")
-            to_remove.add(ws)
-        except Exception as e:
-            logger.error(f"[SUB-BRIDGE] Error enviando mensaje a {ws.remote_address}: {e}")
-            to_remove.add(ws)
+                break
+            except Exception as e:
+                logger.error(f"[SUB-BRIDGE] Error enviando mensaje a {ws.remote_address}: {e}")
+                retry_count -= 1
+                if retry_count > 0:
+                    logger.warning(f"[SUB-BRIDGE] Reintentando envío ({retry_count} intentos restantes)")
+                    await asyncio.sleep(1)
+                    continue
+                to_remove.add(ws)
+                break
 
     for ws in to_remove:
         if ws in connected_clients:
