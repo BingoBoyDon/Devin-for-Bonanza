@@ -277,7 +277,8 @@ async def load_alerts_for_subbridge(sub_bridge_id, db_file: str = DB_FILE):
 
 async def broadcast_message(message: str):
     """
-    Enva 'message' a los sub_bridge correctos segn el campo target_sub_bridge.
+    Envía 'message' a los sub_bridge correctos según el campo target_sub_bridge.
+    Verifica el estado de la conexión antes de enviar.
     """
     try:
         data = json.loads(message)
@@ -314,7 +315,19 @@ async def broadcast_message(message: str):
                 logger.info(f"Sub-bridge removido debido a error de envo: {ws.remote_address}")
 
 async def send_next_media(websocket, sub_bridge_id, targetContainer, retry_count=3):
+    """
+    Envía el siguiente registro de media al cliente.
+    """
     try:
+        # Verificar que el WebSocket esté abierto y en el diccionario de clientes
+        if sub_bridge_id not in sub_bridge_clients or sub_bridge_clients[sub_bridge_id] != websocket:
+            logger.error(f"Sub-bridge {sub_bridge_id} no está registrado o el WebSocket no coincide")
+            return
+        
+        if not websocket.open:
+            logger.error(f"WebSocket no está abierto para sub_bridge {sub_bridge_id}")
+            return
+
         # Cargar registros filtrados por target_id y targetContainer
         media = await load_all_media_by_container(sub_bridge_id, targetContainer)
         if not media:
@@ -376,34 +389,48 @@ async def send_next_media(websocket, sub_bridge_id, targetContainer, retry_count
             await send_next_media(websocket, sub_bridge_id, targetContainer, retry_count - 1)
 
 async def handler(websocket):
+    """
+    Maneja las conexiones de clientes individuales.
+    """
     connected_clients.add(websocket)
     logger.info(f"Nuevo cliente conectado: {websocket.remote_address}")
 
     sub_bridge_id = None
-    connection_ready = False
-    # Intentar recibir el mensaje de identificación en un tiempo límite.
     try:
+        # Esperar mensaje de identificación con timeout
         identification_message = await asyncio.wait_for(websocket.recv(), timeout=5)
         data = json.loads(identification_message)
+        
+        # Verificar identificación del sub_bridge
         if data.get("action") == "sub_bridge_identify" and "id" in data:
             sub_bridge_id = str(data["id"])
             sub_bridge_clients[sub_bridge_id] = websocket
-            connection_ready = True
             logger.info(f"Sub-bridge identificado: ID {sub_bridge_id} conectado desde {websocket.remote_address}")
+            
+            # Asegurar que el WebSocket sigue abierto después de la identificación
+            if not websocket.open:
+                logger.error(f"WebSocket cerrado después de identificación para sub_bridge {sub_bridge_id}")
+                return
         else:
             logger.info("Cliente no se identificó como sub_bridge.")
+            return
     except asyncio.TimeoutError:
-        logger.info("No se recibi mensaje de identificacin. El cliente podr no ser un sub_bridge.")
+        logger.info("No se recibió mensaje de identificación. El cliente podría no ser un sub_bridge.")
+        return
     except Exception as e:
-        logger.error(f"Error procesando el mensaje de identificacin: {e}")
+        logger.error(f"Error procesando el mensaje de identificación: {e}")
+        return
 
     try:
-        # Al conectarse, enviar la secuencia de alerts solo si la conexión está lista:
-        if connection_ready:
-            if sub_bridge_id is not None:
-                resets, updates = await load_alerts_for_subbridge(sub_bridge_id)
-            else:
-                resets, updates = await load_all_alerts()
+        # Cargar y enviar alertas solo para sub_bridges identificados
+        if sub_bridge_id is not None:
+            # Verificar que el WebSocket sigue abierto
+            if not websocket.open:
+                logger.error(f"WebSocket cerrado antes de enviar alertas para sub_bridge {sub_bridge_id}")
+                return
+
+            # Cargar y enviar alertas
+            resets, updates = await load_alerts_for_subbridge(sub_bridge_id)
             for reset in resets:
                 await websocket.send(reset)
                 logger.debug(f"Reset enviado a {websocket.remote_address}: {reset}")
@@ -412,32 +439,31 @@ async def handler(websocket):
                 logger.debug(f"Update enviado a {websocket.remote_address}: {update}")
                 await asyncio.sleep(0.2)
 
-            # Esperar a que la conexión esté lista y enviar el primer registro
-            if sub_bridge_id is not None:
-                await asyncio.sleep(1)  # Dar tiempo para que el WebSocket esté completamente establecido
+            # Verificar conexión antes de enviar media
+            if websocket.open and sub_bridge_id in sub_bridge_clients:
                 await send_next_media(websocket, sub_bridge_id, "photos-grid")
                 await send_next_media(websocket, sub_bridge_id, "videos-container")
             else:
-                await asyncio.sleep(1)  # Dar tiempo para que el WebSocket esté completamente establecido
-                await send_next_media(websocket, "0", "photos-grid")
-                await send_next_media(websocket, "0", "videos-container")
-        else:
-            logger.warning(f"Conexión no lista para {websocket.remote_address}, no se enviarán datos iniciales.")
-
+                logger.error(f"WebSocket cerrado o sub_bridge {sub_bridge_id} no registrado antes de enviar media")
         # Procesar mensajes entrantes
         async for data in websocket:
             logger.info(f"Mensaje recibido de {websocket.remote_address}: {data}")
             try:
+                # Verificar estado del WebSocket antes de procesar mensaje
+                if not websocket.open:
+                    logger.error(f"WebSocket cerrado durante procesamiento de mensaje para sub_bridge {sub_bridge_id}")
+                    return
+
                 parsed = json.loads(data)
                 action = parsed.get("action")
+                
                 if action == "effectCompleted":
                     logger.info("Efecto completado; enviando siguiente registro.")
-                    # Se toma el targetContainer enviado en el mensaje (por defecto 'photos-grid')
                     targetContainer = parsed.get("targetContainer", "photos-grid")
-                    if sub_bridge_id is not None:
+                    if sub_bridge_id is not None and sub_bridge_id in sub_bridge_clients:
                         await send_next_media(websocket, sub_bridge_id, targetContainer)
                     else:
-                        await send_next_media(websocket, "0", targetContainer)
+                        logger.error(f"Sub-bridge {sub_bridge_id} no registrado para enviar siguiente media")
                 elif action in ["update", "updateBoardCell", "reset"]:
                     await upsert_alert(parsed)
                 elif action in ["insertPicture", "insertVideo"]:
@@ -451,6 +477,7 @@ async def handler(websocket):
                     await broadcast_message(data)
             except Exception as e:
                 logger.error(f"Error procesando mensaje de {websocket.remote_address}: {e}")
+                return
 
     finally:
         connected_clients.remove(websocket)
