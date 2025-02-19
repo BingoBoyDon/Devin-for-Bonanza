@@ -166,8 +166,11 @@ async def broadcast_message(message: str):
     to_remove = set()
     for ws in connected_clients.copy():
         try:
-            if not ws.open:
-                logger.warning(f"[SUB-BRIDGE] Cliente {ws.remote_address} no está abierto.")
+            try:
+                pong_waiter = await ws.ping()
+                await asyncio.wait_for(pong_waiter, timeout=5)
+            except Exception as e:
+                logger.warning(f"[SUB-BRIDGE] Cliente {ws.remote_address} no responde: {e}")
                 to_remove.add(ws)
                 continue
                 
