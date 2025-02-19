@@ -365,10 +365,13 @@ async def send_next_media(websocket, sub_bridge_id, targetContainer, retry_count
         await update_media_index(sub_bridge_id, targetContainer, (current_index + 1) % len(media))
         
         # Verificar estado de la conexión antes de enviar
-        if not websocket.open:
-            logger.error(f"WebSocket no está abierto para sub_bridge {sub_bridge_id}")
+        try:
+            pong_waiter = await websocket.ping()
+            await asyncio.wait_for(pong_waiter, timeout=5)
+        except Exception as e:
+            logger.error(f"WebSocket no responde para sub_bridge {sub_bridge_id}: {e}")
             if retry_count > 0:
-                logger.warning(f"Reintentando envío de media ({retry_count} intentos restantes)")
+                logger.warning(f"Reintentando envío ({retry_count} intentos restantes)")
                 await asyncio.sleep(1)
                 await send_next_media(websocket, sub_bridge_id, targetContainer, retry_count - 1)
             return
@@ -436,8 +439,12 @@ async def handler(websocket):
         # Cargar y enviar alertas solo para sub_bridges identificados
         if sub_bridge_id is not None:
             # Verificar que el WebSocket sigue abierto
-            if not websocket.open:
-                logger.error(f"WebSocket cerrado antes de enviar alertas para sub_bridge {sub_bridge_id}")
+            try:
+                pong_waiter = await websocket.ping()
+                await asyncio.wait_for(pong_waiter, timeout=5)
+                logger.info(f"WebSocket activo para sub_bridge {sub_bridge_id}")
+            except Exception as e:
+                logger.error(f"WebSocket no responde antes de enviar alertas para sub_bridge {sub_bridge_id}: {e}")
                 return
 
             # Cargar y enviar alertas
@@ -451,18 +458,26 @@ async def handler(websocket):
                 await asyncio.sleep(0.2)
 
             # Verificar conexión antes de enviar media
-            if websocket.open and sub_bridge_id in sub_bridge_clients:
-                await send_next_media(websocket, sub_bridge_id, "photos-grid")
-                await send_next_media(websocket, sub_bridge_id, "videos-container")
-            else:
-                logger.error(f"WebSocket cerrado o sub_bridge {sub_bridge_id} no registrado antes de enviar media")
+            try:
+                pong_waiter = await websocket.ping()
+                await asyncio.wait_for(pong_waiter, timeout=5)
+                if sub_bridge_id in sub_bridge_clients:
+                    # Send videos first since that's where the data is
+                    await send_next_media(websocket, sub_bridge_id, "videos-container")
+                    await asyncio.sleep(0.5)  # Add delay between sends
+                    await send_next_media(websocket, sub_bridge_id, "photos-grid")
+            except Exception as e:
+                logger.error(f"WebSocket no responde o sub_bridge {sub_bridge_id} no registrado antes de enviar media: {e}")
         # Procesar mensajes entrantes
         async for data in websocket:
             logger.info(f"Mensaje recibido de {websocket.remote_address}: {data}")
             try:
                 # Verificar estado del WebSocket antes de procesar mensaje
-                if not websocket.open:
-                    logger.error(f"WebSocket cerrado durante procesamiento de mensaje para sub_bridge {sub_bridge_id}")
+                try:
+                    pong_waiter = await websocket.ping()
+                    await asyncio.wait_for(pong_waiter, timeout=5)
+                except Exception as e:
+                    logger.error(f"WebSocket no responde durante procesamiento de mensaje para sub_bridge {sub_bridge_id}: {e}")
                     return
 
                 parsed = json.loads(data)
