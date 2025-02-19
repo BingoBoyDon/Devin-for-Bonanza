@@ -310,43 +310,46 @@ function updateVideo(data) {
   const cleanupListeners = () => {
     videoEl.removeEventListener('ended', handleEnded);
     videoEl.removeEventListener('error', handleError);
+    videoEl.removeEventListener('loadeddata', handleLoaded);
     if (timeoutId) {
       clearTimeout(timeoutId);
       timeoutId = null;
     }
   };
 
+  const handleLoaded = () => {
+    console.log("Video cargado correctamente:", data.videoUrl);
+  };
+
   const notifyEffectCompletion = () => {
     if (notified) return;
     notified = true;
 
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      console.error('WebSocket no disponible. Reintentando conexión...');
-      connectWebSocket();
-      setTimeout(() => {
-        notified = false;
-        notifyEffectCompletion();
-      }, 1000);
-      return;
-    }
+    const checkAndSend = () => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        console.error('WebSocket no disponible. Reintentando conexión...');
+        connectWebSocket();
+        setTimeout(checkAndSend, 1000);
+        return;
+      }
 
-    const message = {
-      action: "effectCompleted",
-      type: "video",
-      videoUrl: data.videoUrl,
-      targetContainer: containerId
+      const message = {
+        action: "effectCompleted",
+        type: "video",
+        videoUrl: data.videoUrl,
+        targetContainer: containerId
+      };
+
+      try {
+        ws.send(JSON.stringify(message));
+        console.log(`Notificación de efecto completado enviada: ${containerId}`);
+      } catch (error) {
+        console.error('Error enviando notificación:', error);
+        setTimeout(checkAndSend, 1000);
+      }
     };
 
-    try {
-      ws.send(JSON.stringify(message));
-      console.log(`Notificación de efecto completado enviada: ${containerId}`);
-    } catch (error) {
-      console.error('Error enviando notificación:', error);
-      setTimeout(() => {
-        notified = false;
-        notifyEffectCompletion();
-      }, 1000);
-    }
+    checkAndSend();
 
     if (!data.keepFinalState && container.contains(videoItem)) {
       container.removeChild(videoItem);
@@ -367,6 +370,7 @@ function updateVideo(data) {
 
   videoEl.addEventListener('ended', handleEnded);
   videoEl.addEventListener('error', handleError);
+  videoEl.addEventListener('loadeddata', handleLoaded);
 
   // Fallback timeout
   timeoutId = setTimeout(() => {
@@ -411,9 +415,12 @@ function connectWebSocket() {
 
   ws.onmessage = (event) => {
     try {
+      console.log('Mensaje recibido:', event.data);
       const data = JSON.parse(event.data);
+      console.log('Datos parseados:', data);
       
       if (data.action === "updateBoardCell" && data.cellId) {
+        console.log('Actualizando celda:', data.cellId);
         updateBoardCell(data.cellId, data.image, data.effect, {
           duration: data.duration,
           delay: data.delay,
@@ -423,16 +430,21 @@ function connectWebSocket() {
         updateCounter(true);
         updateSequence(data.cellId);
       } else if (data.action === "reset" && data.cellId) {
+        console.log('Reseteando celda:', data.cellId);
         resetBoardCell(data.cellId);
         resetSequence();
         updateCounter(false);
       } else if (data.action === "refresh") {
+        console.log('Refrescando página');
         location.reload(true);
       } else if (data.action === "updateText") {
+        console.log('Actualizando texto:', data);
         updateText(data);
       } else if (data.action === "updatePicture") {
+        console.log('Actualizando foto:', data);
         updatePhoto(data);
       } else if (data.action === "updateVideo" && data.videoUrl) {
+        console.log('Actualizando video:', data.videoUrl);
         updateVideo(data);
       } else {
         console.error('Formato de datos o acción no válidos:', data);
