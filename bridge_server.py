@@ -301,12 +301,44 @@ async def broadcast_message(message: str):
 
     to_remove = set()
     for ws in recipients:
-        try:
-            await ws.send(message)
-            logger.debug(f"Mensaje enviado a {ws.remote_address}: {message}")
-        except Exception as e:
-            logger.error(f"Error enviando mensaje a {ws.remote_address}: {e}")
-            to_remove.add(ws)
+        retry_count = 3
+        while retry_count > 0:
+            try:
+                # Verificar estado del WebSocket antes de enviar
+                try:
+                    pong_waiter = await ws.ping()
+                    await asyncio.wait_for(pong_waiter, timeout=5)
+                except Exception as e:
+                    logger.error(f"WebSocket no responde para {ws.remote_address}: {e}")
+                    retry_count -= 1
+                    if retry_count > 0:
+                        logger.warning(f"Reintentando envío ({retry_count} intentos restantes)")
+                        await asyncio.sleep(1)
+                        continue
+                    to_remove.add(ws)
+                    break
+
+                await ws.send(message)
+                logger.debug(f"Mensaje enviado a {ws.remote_address}: {message}")
+                break
+            except websockets.exceptions.ConnectionClosed as e:
+                logger.error(f"Conexión cerrada al enviar mensaje a {ws.remote_address}: {e}")
+                retry_count -= 1
+                if retry_count > 0:
+                    logger.warning(f"Reintentando envío ({retry_count} intentos restantes)")
+                    await asyncio.sleep(1)
+                    continue
+                to_remove.add(ws)
+                break
+            except Exception as e:
+                logger.error(f"Error enviando mensaje a {ws.remote_address}: {e}")
+                retry_count -= 1
+                if retry_count > 0:
+                    logger.warning(f"Reintentando envío ({retry_count} intentos restantes)")
+                    await asyncio.sleep(1)
+                    continue
+                to_remove.add(ws)
+                break
 
     for ws in to_remove:
         for key, client in list(sub_bridge_clients.items()):
