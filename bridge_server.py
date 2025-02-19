@@ -478,10 +478,6 @@ async def handler(websocket):
                     await asyncio.wait_for(pong_waiter, timeout=5)
                 except Exception as e:
                     logger.error(f"WebSocket no responde durante procesamiento de mensaje para sub_bridge {sub_bridge_id}: {e}")
-                    if retry_count > 0:
-                        logger.warning(f"Reintentando procesamiento ({retry_count} intentos restantes)")
-                        await asyncio.sleep(1)
-                        await send_next_media(websocket, sub_bridge_id, targetContainer, retry_count - 1)
                     return
 
                 parsed = json.loads(data)
