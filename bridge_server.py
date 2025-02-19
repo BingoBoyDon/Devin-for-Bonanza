@@ -333,7 +333,6 @@ async def send_next_media(websocket, sub_bridge_id, targetContainer, retry_count
         if not media:
             logger.warning(f"No se encontraron registros para enviar al sub_bridge {sub_bridge_id} en contenedor {targetContainer}.")
             return
-            return
 
         # Obtener índice persistente
         current_index = await get_media_index(sub_bridge_id, targetContainer)
