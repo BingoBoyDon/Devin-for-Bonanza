@@ -351,14 +351,16 @@ async def send_next_media(websocket, sub_bridge_id, targetContainer, retry_count
     Envía el siguiente registro de media al cliente.
     """
     try:
-        # Verificar que el WebSocket esté abierto y en el diccionario de clientes
+        # Verificar que el WebSocket esté en el diccionario de clientes
         if sub_bridge_id not in sub_bridge_clients or sub_bridge_clients[sub_bridge_id] != websocket:
             logger.error(f"Sub-bridge {sub_bridge_id} no está registrado o el WebSocket no coincide")
             return
 
+        # Verificar que el WebSocket esté activo
         try:
             pong_waiter = await websocket.ping()
             await asyncio.wait_for(pong_waiter, timeout=5)
+            logger.debug(f"WebSocket activo para sub_bridge {sub_bridge_id}")
         except Exception as e:
             logger.error(f"WebSocket no responde para sub_bridge {sub_bridge_id}: {e}")
             return
