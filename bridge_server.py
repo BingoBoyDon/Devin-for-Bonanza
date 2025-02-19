@@ -362,19 +362,25 @@ async def send_next_media(websocket, sub_bridge_id, targetContainer, retry_count
         await update_media_index(sub_bridge_id, targetContainer, (current_index + 1) % len(media))
         
         # Verificar estado de la conexión antes de enviar
-        if hasattr(websocket, 'open') and websocket.open:
-            try:
-                await websocket.send(next_record)
-                logger.info(f"Media enviado a sub_bridge {sub_bridge_id} en contenedor {targetContainer}: índice {current_index}")
-            except Exception as e:
-                if retry_count > 0:
-                    logger.warning(f"Reintentando envío de media ({retry_count} intentos restantes)")
-                    await asyncio.sleep(1)
-                    await send_next_media(websocket, sub_bridge_id, targetContainer, retry_count - 1)
-                else:
-                    raise e
-        else:
+        if not websocket.open:
             logger.error(f"WebSocket no está abierto para sub_bridge {sub_bridge_id}")
+            if retry_count > 0:
+                logger.warning(f"Reintentando envío de media ({retry_count} intentos restantes)")
+                await asyncio.sleep(1)
+                await send_next_media(websocket, sub_bridge_id, targetContainer, retry_count - 1)
+            return
+
+        try:
+            await websocket.send(next_record)
+            logger.info(f"Media enviado a sub_bridge {sub_bridge_id} en contenedor {targetContainer}: índice {current_index}")
+        except websockets.exceptions.ConnectionClosed as e:
+            logger.error(f"Conexión cerrada al enviar media a sub_bridge {sub_bridge_id}: {e}")
+            if retry_count > 0:
+                logger.warning(f"Reintentando envío de media ({retry_count} intentos restantes)")
+                await asyncio.sleep(1)
+                await send_next_media(websocket, sub_bridge_id, targetContainer, retry_count - 1)
+        except Exception as e:
+            logger.error(f"Error enviando media a sub_bridge {sub_bridge_id}: {e}")
             if retry_count > 0:
                 logger.warning(f"Reintentando envío de media ({retry_count} intentos restantes)")
                 await asyncio.sleep(1)
@@ -382,7 +388,6 @@ async def send_next_media(websocket, sub_bridge_id, targetContainer, retry_count
             
     except Exception as e:
         logger.error(f"Error en send_next_media para {sub_bridge_id} en {targetContainer}: {e}")
-        # Solo reintentamos si aún tenemos intentos disponibles
         if retry_count > 0:
             logger.warning(f"Reintentando envío de media ({retry_count} intentos restantes)")
             await asyncio.sleep(1)
