@@ -536,9 +536,12 @@ async def handler(websocket):
                 await asyncio.wait_for(pong_waiter, timeout=5)
                 if sub_bridge_id in sub_bridge_clients:
                     # Send videos first since that's where the data is
+                    logger.info(f"Enviando videos para sub_bridge {sub_bridge_id}")
                     await send_next_media(websocket, sub_bridge_id, "videos-container")
-                    await asyncio.sleep(0.5)  # Add delay between sends
+                    await asyncio.sleep(1)  # Increased delay between sends
+                    logger.info(f"Enviando fotos para sub_bridge {sub_bridge_id}")
                     await send_next_media(websocket, sub_bridge_id, "photos-grid")
+                    logger.info(f"Media inicial enviado para sub_bridge {sub_bridge_id}")
             except Exception as e:
                 logger.error(f"WebSocket no responde o sub_bridge {sub_bridge_id} no registrado antes de enviar media: {e}")
         # Procesar mensajes entrantes
