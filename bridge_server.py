@@ -480,12 +480,22 @@ async def handler(websocket):
                 return
 
     finally:
-        connected_clients.remove(websocket)
+        # Cleanup connected clients
+        if websocket in connected_clients:
+            connected_clients.remove(websocket)
+            logger.info(f"Cliente removido: {websocket.remote_address}")
+
+        # Cleanup sub_bridge clients
         for key, ws in list(sub_bridge_clients.items()):
             if ws == websocket:
                 del sub_bridge_clients[key]
                 logger.info(f"Sub-bridge con ID {key} removido.")
-        logger.info(f"Cliente removido: {websocket.remote_address}")
+                # Ensure we log any pending media state
+                try:
+                    current_index = await get_media_index(key, "videos-container")
+                    logger.info(f"Estado final de media para sub_bridge {key}: índice {current_index}")
+                except Exception as e:
+                    logger.error(f"Error obteniendo estado final de media para sub_bridge {key}: {e}")
 
 async def main():
     """
