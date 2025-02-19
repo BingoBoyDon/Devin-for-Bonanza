@@ -319,13 +319,10 @@ async def send_next_media(websocket, sub_bridge_id, targetContainer, retry_count
     Envía el siguiente registro de media al cliente.
     """
     try:
-        # Verificar que el WebSocket esté abierto y en el diccionario de clientes
-        if sub_bridge_id not in sub_bridge_clients or sub_bridge_clients[sub_bridge_id] != websocket:
-            logger.error(f"Sub-bridge {sub_bridge_id} no está registrado o el WebSocket no coincide")
-            return
-        
-        if not websocket.open:
-            logger.error(f"WebSocket no está abierto para sub_bridge {sub_bridge_id}")
+        # Cargar registros filtrados por target_id y targetContainer
+        media = await load_all_media_by_container(sub_bridge_id, targetContainer)
+        if not media:
+            logger.warning(f"No se encontraron registros para enviar al sub_bridge {sub_bridge_id} en contenedor {targetContainer}.")
             return
 
         # Cargar registros filtrados por target_id y targetContainer
