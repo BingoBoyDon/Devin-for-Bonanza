@@ -324,8 +324,11 @@ async def send_next_media(websocket, sub_bridge_id, targetContainer, retry_count
             logger.error(f"Sub-bridge {sub_bridge_id} no está registrado o el WebSocket no coincide")
             return
 
-        if not websocket.open:
-            logger.error(f"WebSocket no está abierto para sub_bridge {sub_bridge_id}")
+        try:
+            pong_waiter = await websocket.ping()
+            await asyncio.wait_for(pong_waiter, timeout=5)
+        except Exception as e:
+            logger.error(f"WebSocket no responde para sub_bridge {sub_bridge_id}: {e}")
             return
 
         # Cargar registros filtrados por target_id y targetContainer
@@ -413,8 +416,11 @@ async def handler(websocket):
             logger.info(f"Sub-bridge identificado: ID {sub_bridge_id} conectado desde {websocket.remote_address}")
             
             # Asegurar que el WebSocket sigue abierto después de la identificación
-            if not websocket.open:
-                logger.error(f"WebSocket cerrado después de identificación para sub_bridge {sub_bridge_id}")
+            try:
+                pong_waiter = await websocket.ping()
+                await asyncio.wait_for(pong_waiter, timeout=5)
+            except Exception as e:
+                logger.error(f"WebSocket no responde después de identificación para sub_bridge {sub_bridge_id}: {e}")
                 return
         else:
             logger.info("Cliente no se identificó como sub_bridge.")
