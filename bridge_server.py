@@ -474,7 +474,7 @@ async def handler(websocket):
             try:
                 pong_waiter = await websocket.ping()
                 await asyncio.wait_for(pong_waiter, timeout=5)
-                logger.info(f"WebSocket activo para sub_bridge {sub_bridge_id}")
+                logger.info(f"WebSocket activo para sub_bridge {sub_bridge_id} - Preparando envío de alertas")
             except Exception as e:
                 logger.error(f"WebSocket no responde antes de enviar alertas para sub_bridge {sub_bridge_id}: {e}")
                 return
@@ -534,16 +534,18 @@ async def handler(websocket):
             try:
                 pong_waiter = await websocket.ping()
                 await asyncio.wait_for(pong_waiter, timeout=5)
+                logger.info(f"WebSocket activo para sub_bridge {sub_bridge_id} - Preparando envío de media")
                 if sub_bridge_id in sub_bridge_clients:
                     # Send videos first since that's where the data is
-                    logger.info(f"Enviando videos para sub_bridge {sub_bridge_id}")
+                    logger.info(f"Iniciando envío de videos para sub_bridge {sub_bridge_id}")
                     await send_next_media(websocket, sub_bridge_id, "videos-container")
                     await asyncio.sleep(1)  # Increased delay between sends
-                    logger.info(f"Enviando fotos para sub_bridge {sub_bridge_id}")
+                    logger.info(f"Iniciando envío de fotos para sub_bridge {sub_bridge_id}")
                     await send_next_media(websocket, sub_bridge_id, "photos-grid")
-                    logger.info(f"Media inicial enviado para sub_bridge {sub_bridge_id}")
+                    logger.info(f"Media inicial enviado exitosamente para sub_bridge {sub_bridge_id}")
             except Exception as e:
                 logger.error(f"WebSocket no responde o sub_bridge {sub_bridge_id} no registrado antes de enviar media: {e}")
+                logger.debug(f"Estado de conexión para sub_bridge {sub_bridge_id}: {'registrado' if sub_bridge_id in sub_bridge_clients else 'no registrado'}")
         # Procesar mensajes entrantes
         async for data in websocket:
             logger.info(f"Mensaje recibido de {websocket.remote_address}: {data}")
