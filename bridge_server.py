@@ -481,13 +481,54 @@ async def handler(websocket):
 
             # Cargar y enviar alertas
             resets, updates = await load_alerts_for_subbridge(sub_bridge_id)
+            retry_count = 3
             for reset in resets:
-                await websocket.send(reset)
-                logger.debug(f"Reset enviado a {websocket.remote_address}: {reset}")
+                while retry_count > 0:
+                    try:
+                        await websocket.send(reset)
+                        logger.debug(f"Reset enviado a {websocket.remote_address}: {reset}")
+                        break
+                    except websockets.exceptions.ConnectionClosed as e:
+                        logger.error(f"Conexión cerrada al enviar reset a {websocket.remote_address}: {e}")
+                        retry_count -= 1
+                        if retry_count > 0:
+                            logger.warning(f"Reintentando envío de reset ({retry_count} intentos restantes)")
+                            await asyncio.sleep(1)
+                            continue
+                        return
+                    except Exception as e:
+                        logger.error(f"Error enviando reset a {websocket.remote_address}: {e}")
+                        retry_count -= 1
+                        if retry_count > 0:
+                            logger.warning(f"Reintentando envío de reset ({retry_count} intentos restantes)")
+                            await asyncio.sleep(1)
+                            continue
+                        return
+
+            retry_count = 3
             for update in updates:
-                await websocket.send(update)
-                logger.debug(f"Update enviado a {websocket.remote_address}: {update}")
-                await asyncio.sleep(0.2)
+                while retry_count > 0:
+                    try:
+                        await websocket.send(update)
+                        logger.debug(f"Update enviado a {websocket.remote_address}: {update}")
+                        await asyncio.sleep(0.2)
+                        break
+                    except websockets.exceptions.ConnectionClosed as e:
+                        logger.error(f"Conexión cerrada al enviar update a {websocket.remote_address}: {e}")
+                        retry_count -= 1
+                        if retry_count > 0:
+                            logger.warning(f"Reintentando envío de update ({retry_count} intentos restantes)")
+                            await asyncio.sleep(1)
+                            continue
+                        return
+                    except Exception as e:
+                        logger.error(f"Error enviando update a {websocket.remote_address}: {e}")
+                        retry_count -= 1
+                        if retry_count > 0:
+                            logger.warning(f"Reintentando envío de update ({retry_count} intentos restantes)")
+                            await asyncio.sleep(1)
+                            continue
+                        return
 
             # Verificar conexión antes de enviar media
             try:
