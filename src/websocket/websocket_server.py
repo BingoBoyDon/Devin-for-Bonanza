@@ -40,6 +40,10 @@ priority_queues = {
     "normal": defaultdict(asyncio.Queue),
 }
 
+# Diccionario para rastrear clientes que están procesando mensajes pendientes
+# Estructura: {mac_id: True/False}
+clients_processing_pending = {}
+
 # Filtro para el debugger (opcional)
 class MessageFilter(logging.Filter):
     def __init__(self, message_id=None):
@@ -68,21 +72,30 @@ async def send_pending_messages(mac_id):
     if not client_pending:
         logger.info(f"No hay mensajes pendientes para el cliente {mac_id}")
         return
+    
+    # Marcar que este cliente está procesando mensajes pendientes
+    clients_processing_pending[mac_id] = True
+    logger.info(f"Cliente {mac_id} comenzó a procesar mensajes pendientes")
+    
+    try:
+        # Ordenar por timestamp (del más antiguo al más reciente)
+        sorted_messages = sorted(
+            client_pending.items(), 
+            key=lambda item: item[1]["timestamp"]
+        )
         
-    # Ordenar por timestamp (del más antiguo al más reciente)
-    sorted_messages = sorted(
-        client_pending.items(), 
-        key=lambda item: item[1]["timestamp"]
-    )
-    
-    logger.info(f"Enviando {len(sorted_messages)} mensajes pendientes al cliente {mac_id}")
-    
-    for msg_id, data in sorted_messages:
-        try:
-            await connected_clients[mac_id].send(json.dumps(data["message"]))
-            logger.info(f"Mensaje pendiente {msg_id} enviado a {mac_id}")
-        except Exception as e:
-            logger.error(f"Error enviando mensaje pendiente {msg_id} a {mac_id}: {e}")
+        logger.info(f"Enviando {len(sorted_messages)} mensajes pendientes al cliente {mac_id}")
+        
+        for msg_id, data in sorted_messages:
+            try:
+                await connected_clients[mac_id].send(json.dumps(data["message"]))
+                logger.info(f"Mensaje pendiente {msg_id} enviado a {mac_id}")
+            except Exception as e:
+                logger.error(f"Error enviando mensaje pendiente {msg_id} a {mac_id}: {e}")
+    finally:
+        # Desmarcar que este cliente está procesando mensajes pendientes
+        clients_processing_pending[mac_id] = False
+        logger.info(f"Cliente {mac_id} terminó de procesar mensajes pendientes")
 
 async def handle_client(websocket):
     mac_id = None
@@ -118,9 +131,16 @@ async def handle_client(websocket):
     except websockets.exceptions.ConnectionClosedError:
         logger.warning(f"Connection closed for {mac_id if mac_id else 'unknown client'}.")
     finally:
-        if mac_id and mac_id in connected_clients:
-            del connected_clients[mac_id]
-            logger.info(f"Client disconnected: {mac_id}")
+        if mac_id:
+            # Limpiar el flag de procesamiento si el cliente se desconecta
+            if mac_id in clients_processing_pending:
+                clients_processing_pending[mac_id] = False
+                logger.info(f"Flag de procesamiento limpiado para cliente desconectado: {mac_id}")
+            
+            if mac_id in connected_clients:
+                del connected_clients[mac_id]
+                logger.info(f"Client disconnected: {mac_id}")
+
 
 async def handle_confirmation(confirmation):
     """Procesa confirmaciones recibidas y elimina mensajes de pendientes."""
@@ -158,59 +178,69 @@ async def send_to_client(mac_id, message, priority="normal", requires_confirmati
         logger.error(f"Invalid priority level: {priority}")
         return
 
-    if mac_id in connected_clients:
-        try:
-            message_dict = json.loads(message)
-            # Si el mensaje es para bridge_server.py, agregar identificador único
-            if message_dict.get("program") == "bridge_server.py":
-                message_id_counter += 1
-                message_id = message_id_counter
-                message_with_id = {
-                    "id": message_id,
-                    "data": message_dict
-                }
-                
-                # Solo almacenar mensajes que requieren confirmación
-                if requires_confirmation:
-                    pending_messages[message_id] = {
-                        "mac_id": mac_id, 
-                        "message": message_with_id,
-                        "timestamp": time.time()
-                    }
-                    logger.info(f"Mensaje {message_id} añadido a pendientes para {mac_id} (requiere confirmación)")
-                else:
-                    logger.info(f"Mensaje {message_id} enviado a {mac_id} (no requiere confirmación)")
-                    
-                message_to_send = json.dumps(message_with_id)
-            else:
-                message_to_send = message
+    # Preparar el mensaje
+    try:
+        message_dict = json.loads(message)
+    except json.JSONDecodeError:
+        logger.error(f"Error decodificando JSON: {message}")
+        return
 
-            await connected_clients[mac_id].send(message_to_send)
-            logger.info(f"JSON message sent to {mac_id}: {message_to_send}")
-        except Exception as e:
-            logger.error(f"Error sending message to {mac_id}: {e}")
-    else:
-        logger.warning(f"Client {mac_id} is not connected.")
-        # Si el cliente no está conectado y el mensaje requiere confirmación,
-        # almacenarlo para enviarlo cuando se conecte
+    # Si el mensaje es para bridge_server.py, agregar identificador único
+    if message_dict.get("program") == "bridge_server.py":
+        message_id_counter += 1
+        message_id = message_id_counter
+        message_with_id = {
+            "id": message_id,
+            "data": message_dict
+        }
+        
+        # Solo almacenar mensajes que requieren confirmación
         if requires_confirmation:
-            try:
-                message_dict = json.loads(message)
-                if message_dict.get("program") == "bridge_server.py":
-                    message_id_counter += 1
-                    message_id = message_id_counter
-                    message_with_id = {
-                        "id": message_id,
-                        "data": message_dict
-                    }
-                    pending_messages[message_id] = {
-                        "mac_id": mac_id, 
-                        "message": message_with_id,
-                        "timestamp": time.time()
-                    }
-                    logger.info(f"Cliente {mac_id} no conectado. Mensaje {message_id} almacenado para envío posterior.")
-            except Exception as e:
-                logger.error(f"Error almacenando mensaje para cliente desconectado {mac_id}: {e}")
+            pending_messages[message_id] = {
+                "mac_id": mac_id, 
+                "message": message_with_id,
+                "timestamp": time.time()
+            }
+            logger.info(f"Mensaje {message_id} añadido a pendientes para {mac_id} (requiere confirmación)")
+        
+        # Verificar si el cliente está procesando mensajes pendientes
+        if mac_id in connected_clients:
+            if mac_id in clients_processing_pending and clients_processing_pending[mac_id]:
+                # El cliente está procesando mensajes pendientes, añadir a la cola
+                logger.info(f"Cliente {mac_id} está procesando mensajes pendientes. Añadiendo mensaje {message_id} a la cola.")
+                await priority_queues[priority][mac_id].put(message_dict)
+                return
+            else:
+                # El cliente no está procesando mensajes pendientes, enviar directamente
+                if not requires_confirmation:
+                    logger.info(f"Mensaje {message_id} enviado a {mac_id} (no requiere confirmación)")
+                
+                try:
+                    await connected_clients[mac_id].send(json.dumps(message_with_id))
+                    logger.info(f"JSON message sent to {mac_id}: {message_with_id}")
+                except Exception as e:
+                    logger.error(f"Error sending message to {mac_id}: {e}")
+        else:
+            logger.warning(f"Client {mac_id} is not connected.")
+            # Si el cliente no está conectado y el mensaje requiere confirmación,
+            # ya está almacenado en pending_messages
+    else:
+        # Para mensajes que no son para bridge_server.py
+        if mac_id in connected_clients:
+            if mac_id in clients_processing_pending and clients_processing_pending[mac_id]:
+                # El cliente está procesando mensajes pendientes, añadir a la cola
+                logger.info(f"Cliente {mac_id} está procesando mensajes pendientes. Añadiendo mensaje a la cola.")
+                await priority_queues[priority][mac_id].put(message_dict)
+                return
+            else:
+                # El cliente no está procesando mensajes pendientes, enviar directamente
+                try:
+                    await connected_clients[mac_id].send(message)
+                    logger.info(f"JSON message sent to {mac_id}: {message}")
+                except Exception as e:
+                    logger.error(f"Error sending message to {mac_id}: {e}")
+        else:
+            logger.warning(f"Client {mac_id} is not connected.")
 
 async def listen_to_external_program(host="127.0.0.1", port=9999):
     server = await asyncio.start_server(handle_external_connection, host, port)
