@@ -33,20 +33,20 @@ function sendWebsocketMessage(cellId, macId, action = "updateBoardCell") {
     
     // Construir el mensaje JSON
     const message = {
-        mac_id: macId,
-        priority: "normal",
-        program: "bridge_server.py",
-        plane: 2,
-        description: action === "reset" ? "reset cell image" : "update board cell",
-        cellId: cellId,
-        action: action,
-        effect: randomEffect,
-        target_sub_bridge: 0,
-        duration: 2,
-        delay: 0,
-        iterationCount: 3,
-        keepFinalState: true,
-        requires_confirmation: true
+        "mac_id": macId,
+        "priority": "normal",
+        "program": "bridge_server.py",
+        "plane": 2,
+        "description": action === "reset" ? "reset cell image" : "update board cell",
+        "cellId": cellId,
+        "action": action,
+        "effect": randomEffect,
+        "target_sub_bridge": 0,
+        "duration": 2,
+        "delay": 0,
+        "iterationCount": 3,
+        "keepFinalState": true,
+        "requires_confirmation": true
     };
     
     // Enviar el mensaje al servidor TCP
@@ -94,22 +94,22 @@ function sendTextMessage(text, macId, fontFamily = "Courier New", fontSize = "10
         effect = effects[Math.floor(Math.random() * effects.length)];
     }
     
-    // Construir el mensaje JSON
+    // Construir el mensaje JSON exactamente como en el script Python de ejemplo
     const message = {
-        mac_id: macId,
-        priority: "normal",
-        program: "bridge_server.py",
-        plane: 2,
-        description: "update text",
-        action: "updateText",
-        text: text,
-        fontFamily: fontFamily,
-        fontSize: fontSize,
-        color: color,
-        effect: effect,
-        duration: duration,
-        delay: delay,
-        target_sub_bridge: 0
+        "mac_id": macId,
+        "priority": "normal",
+        "program": "bridge_server.py",
+        "plane": 2,
+        "description": "update text",
+        "action": "updateText",
+        "text": text,
+        "fontFamily": fontFamily,
+        "fontSize": fontSize,
+        "color": color,
+        "effect": effect,
+        "duration": duration,
+        "delay": delay,
+        "target_sub_bridge": 0
     };
     
     // Enviar el mensaje al servidor TCP
