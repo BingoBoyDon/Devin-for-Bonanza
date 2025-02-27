@@ -1,4 +1,3 @@
-
 // script.js
 
 // Variables globales
@@ -9,13 +8,6 @@ let sequence = []; // Array para almacenar la secuencia de números seleccionado
 
 // Evento que se ejecuta cuando el DOM está completamente cargado
 document.addEventListener("DOMContentLoaded", function() {
-    // Obtener la dirección MAC al cargar la página
-    getMacAddress(siteId).then(mac => {
-        if (mac) {
-            macAddress = mac;
-            console.log("MAC address initialized:", macAddress);
-        }
-    });
     // Check if configValue is '0' and display the toaster message
     if (configValue === '0') {
         showMessage("Cannot do the bingo draw because it is not yet scheduled", "info", 15000);
@@ -67,17 +59,26 @@ function generateNumberBoxes(parent, start, end) {
                 
                 // Si no tenemos la dirección MAC, obtenerla
                 if (!macAddress) {
-                    getMacAddress(siteId).then(mac => {
-                        if (mac) {
-                            macAddress = mac;
-                            // Enviar el mensaje al servidor websocket
-                            sendWebsocketMessage(cellId, macAddress);
-                        }
-                    });
+                    if (typeof sendWebsocketMessage === "function" && typeof getMacAddress === "function") {
+                        getMacAddress(siteId).then(mac => {
+                            if (mac) {
+                                macAddress = mac;
+                                // Enviar el mensaje al servidor websocket
+                                sendWebsocketMessage(cellId, macAddress);
+                            }
+                        });
+                    } else {
+                        console.error("Required functions are not defined");
+                    }
                 } else {
                     // Ya tenemos la dirección MAC, enviar el mensaje directamente
-                    sendWebsocketMessage(cellId, macAddress);
+                    if (typeof sendWebsocketMessage === "function") {
+                        sendWebsocketMessage(cellId, macAddress);
+                    } else {
+                        console.error("sendWebsocketMessage function is not defined");
+                    }
                 }
+                
                 if (!this.classList.contains('marked') && sequence.length < 30) {
                     this.classList.add('marked');
                     const currentSequence = sequence.length + 1;
@@ -499,3 +500,18 @@ function updateGameNumber() {
         })
         .catch(error => console.error('Error fetching the game number:', error));
 }
+
+// Función para inicializar la dirección MAC después de que todos los scripts estén cargados
+window.addEventListener('load', function() {
+    // Obtener la dirección MAC al cargar la página
+    if (typeof getMacAddress === 'function') {
+        getMacAddress(siteId).then(mac => {
+            if (mac) {
+                macAddress = mac;
+                console.log("MAC address initialized:", macAddress);
+            }
+        });
+    } else {
+        console.error("getMacAddress function is not defined");
+    }
+});

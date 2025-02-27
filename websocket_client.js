@@ -1,7 +1,6 @@
 // websocket_client.js
 
 // Variable global para almacenar la dirección MAC
-let macAddress = '';
 
 // Función para obtener la dirección MAC del servidor
 function getMacAddress(siteId) {
