@@ -99,16 +99,17 @@ function generateNumberBoxes(parent, start, end) {
                         checkLastSequence();
                     }
                 } else if (this.classList.contains('marked')) {
-                    // Enviar mensaje de reset cuando se desmarca un número
-                    if (typeof sendWebsocketMessage === "function") {
-                        sendWebsocketMessage(cellId, macAddress, "reset");
-                    } else {
-                        console.error("sendWebsocketMessage function is not defined");
-                    }
-                    
                     const lastNumber = sequence[sequence.length - 1];
                     const lastSelected = `${parent} ${i}` === lastNumber;
+                    
                     if (lastSelected) {
+                        // Enviar mensaje de reset solo cuando se desmarca el último número
+                        if (typeof sendWebsocketMessage === "function") {
+                            sendWebsocketMessage(cellId, macAddress, "reset");
+                        } else {
+                            console.error("sendWebsocketMessage function is not defined");
+                        }
+                        
                         this.classList.remove('marked');
                         this.removeAttribute('data-sequence');
                         sequence.pop();
