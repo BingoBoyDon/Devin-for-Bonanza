@@ -94,15 +94,36 @@ function generateNumberBoxes(parent, start, end) {
                         checkLastSequence();
                     }
                 } else if (this.classList.contains('marked')) {
+                    // Enviar mensaje de reset cuando se desmarca un número
+                    if (typeof sendWebsocketMessage === "function") {
+                        sendWebsocketMessage(cellId, macAddress, "reset");
+                    } else {
+                        console.error("sendWebsocketMessage function is not defined");
+                    }
+                    
                     const lastNumber = sequence[sequence.length - 1];
                     const lastSelected = `${parent} ${i}` === lastNumber;
                     if (lastSelected) {
                         this.classList.remove('marked');
+                        this.removeAttribute('data-sequence');
                         sequence.pop();
                     } else {
-                        const lastNumberSplit = lastNumber.split(" ");
-                        const lastNumberToUnmark = lastNumberSplit[1];
-                        showMessage(`Please unmark number ${lastNumberToUnmark} first.`, "info");
+                        // Permitir desmarcar cualquier número, no solo el último
+                        const index = sequence.indexOf(`${parent} ${i}`);
+                        if (index !== -1) {
+                            this.classList.remove('marked');
+                            this.removeAttribute('data-sequence');
+                            sequence.splice(index, 1);
+                            
+                            // Actualizar los números de secuencia para los elementos restantes
+                            document.querySelectorAll('.column div.marked').forEach((element, idx) => {
+                                element.setAttribute('data-sequence', idx + 1);
+                            });
+                        } else {
+                            const lastNumberSplit = lastNumber.split(" ");
+                            const lastNumberToUnmark = lastNumberSplit[1];
+                            showMessage(`Please unmark number ${lastNumberToUnmark} first.`, "info");
+                        }
                     }
                 } else {
                     if (sequence.length >= 30) {
@@ -167,9 +188,17 @@ function updateSequenceDisplay() {
  * Función para reiniciar el Bingo, desmarcando todos los números seleccionados.
  */
 function resetBingo() {
+    // Enviar mensajes de reset para todos los números
+    if (typeof sendResetAllMessages === "function" && macAddress) {
+        sendResetAllMessages(macAddress);
+    } else {
+        console.error("sendResetAllMessages function is not defined or MAC address is not available");
+    }
+    
     sequence = []; // Limpiar el array de secuencia
     document.querySelectorAll('.column div.marked').forEach(element => {
         element.classList.remove('marked'); // Remover clase marcada
+        element.removeAttribute('data-sequence'); // Eliminar el atributo data-sequence
     });
     updateSequenceDisplay(); // Actualizar visualización de la secuencia
     document.getElementById('set-bingo-button').style.display = 'none'; // Ocultar botón "Set Bingo"
@@ -183,10 +212,6 @@ function resetBingo() {
 
 // Evento al hacer clic en el botón "Reset Selected"
 document.getElementById('reset-bingo-button').addEventListener('click', resetBingo);
-
-/**
- * Function to display messages in the message container.
- * @param {string} message - The message to display.
  * @param {string} type - The type of message: 'error', 'success', 'info', 'warning'.
  * @param {number} duration - (Optional) Duration in milliseconds to display the message.
  * @param {function} callback - (Optional) Function to call after the message hides.

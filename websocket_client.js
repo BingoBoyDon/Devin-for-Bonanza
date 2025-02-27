@@ -28,7 +28,7 @@ function getMacAddress(siteId) {
 }
 
 // Función para enviar un mensaje JSON al servidor websocket
-function sendWebsocketMessage(cellId, macId) {
+function sendWebsocketMessage(cellId, macId, action = "updateBoardCell") {
     // Seleccionar un efecto aleatorio
     const effects = ["flipInY", "bounceIn", "zoomInLeft", "zoomInRight", "jackInTheBox"];
     const randomEffect = effects[Math.floor(Math.random() * effects.length)];
@@ -39,9 +39,9 @@ function sendWebsocketMessage(cellId, macId) {
         priority: "normal",
         program: "bridge_server.py",
         plane: 2,
-        description: "update board cell",
+        description: action === "reset" ? "reset cell image" : "update board cell",
         cellId: cellId,
-        action: "updateBoardCell",
+        action: action,
         effect: randomEffect,
         target_sub_bridge: 0,
         duration: 2,
@@ -69,11 +69,59 @@ function sendWebsocketMessage(cellId, macId) {
             showMessage(`Error sending message: ${data.error}`, 'error');
         } else {
             console.log('Message sent successfully:', data);
-            showMessage(`Message sent for ${cellId}`, 'success');
+            showMessage(`Message sent for ${cellId} (${action})`, 'success');
         }
     })
     .catch(error => {
         console.error('Error sending message:', error);
         showMessage('Error sending message to server', 'error');
+    });
+}
+
+// Función para generar todos los cell_ids posibles
+function generateAllCellIds() {
+    const allCells = [];
+    
+    // B = 1 a 15
+    for (let i = 1; i <= 15; i++) {
+        allCells.push(`B${i}`);
+    }
+    // I = 16 a 30
+    for (let i = 16; i <= 30; i++) {
+        allCells.push(`I${i}`);
+    }
+    // N = 31 a 45
+    for (let i = 31; i <= 45; i++) {
+        allCells.push(`N${i}`);
+    }
+    // G = 46 a 60
+    for (let i = 46; i <= 60; i++) {
+        allCells.push(`G${i}`);
+    }
+    // O = 61 a 75
+    for (let i = 61; i <= 75; i++) {
+        allCells.push(`O${i}`);
+    }
+    
+    return allCells;
+}
+
+// Función para enviar mensajes de reset para todos los números
+function sendResetAllMessages(macId) {
+    if (!macId) {
+        console.error("MAC address is required to send reset messages");
+        showMessage("Error: MAC address is required to send reset messages", "error");
+        return;
+    }
+    
+    const allCells = generateAllCellIds();
+    console.log(`Sending reset messages for ${allCells.length} cells`);
+    
+    // Enviar mensajes de reset para cada celda
+    allCells.forEach((cellId, index) => {
+        // Añadir un pequeño retraso para evitar sobrecargar el servidor
+        setTimeout(() => {
+            sendWebsocketMessage(cellId, macId, "reset");
+        }, index * 20); // 20ms de retraso entre mensajes
     });
 }
