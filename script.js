@@ -212,6 +212,7 @@ function resetBingo() {
 
 // Evento al hacer clic en el botón "Reset Selected"
 document.getElementById('reset-bingo-button').addEventListener('click', resetBingo);
+/**
  * @param {string} type - The type of message: 'error', 'success', 'info', 'warning'.
  * @param {number} duration - (Optional) Duration in milliseconds to display the message.
  * @param {function} callback - (Optional) Function to call after the message hides.
