@@ -63,8 +63,10 @@ function generateNumberBoxes(parent, start, end) {
                         getMacAddress(siteId).then(mac => {
                             if (mac) {
                                 macAddress = mac;
-                                // Enviar el mensaje al servidor websocket
-                                sendWebsocketMessage(cellId, macAddress);
+                                // Enviar el mensaje al servidor websocket solo si no se ha alcanzado el límite de 30 números
+                                if (!this.classList.contains('marked') && sequence.length < 30) {
+                                    sendWebsocketMessage(cellId, macAddress);
+                                }
                             }
                         });
                     } else {
@@ -73,7 +75,10 @@ function generateNumberBoxes(parent, start, end) {
                 } else {
                     // Ya tenemos la dirección MAC, enviar el mensaje directamente
                     if (typeof sendWebsocketMessage === "function") {
-                        sendWebsocketMessage(cellId, macAddress);
+                        // Solo enviar el mensaje si estamos marcando un número y no hemos alcanzado el límite de 30
+                        if (!this.classList.contains('marked') && sequence.length < 30) {
+                            sendWebsocketMessage(cellId, macAddress);
+                        }
                     } else {
                         console.error("sendWebsocketMessage function is not defined");
                     }
@@ -108,22 +113,9 @@ function generateNumberBoxes(parent, start, end) {
                         this.removeAttribute('data-sequence');
                         sequence.pop();
                     } else {
-                        // Permitir desmarcar cualquier número, no solo el último
-                        const index = sequence.indexOf(`${parent} ${i}`);
-                        if (index !== -1) {
-                            this.classList.remove('marked');
-                            this.removeAttribute('data-sequence');
-                            sequence.splice(index, 1);
-                            
-                            // Actualizar los números de secuencia para los elementos restantes
-                            document.querySelectorAll('.column div.marked').forEach((element, idx) => {
-                                element.setAttribute('data-sequence', idx + 1);
-                            });
-                        } else {
-                            const lastNumberSplit = lastNumber.split(" ");
-                            const lastNumberToUnmark = lastNumberSplit[1];
-                            showMessage(`Please unmark number ${lastNumberToUnmark} first.`, "info");
-                        }
+                        const lastNumberSplit = lastNumber.split(" ");
+                        const lastNumberToUnmark = lastNumberSplit[1];
+                        showMessage(`Please unmark number ${lastNumberToUnmark} first.`, "info");
                     }
                 } else {
                     if (sequence.length >= 30) {
@@ -219,7 +211,6 @@ document.getElementById('reset-bingo-button').addEventListener('click', resetBin
  * @param {number} duration - (Optional) Duration in milliseconds to display the message.
  * @param {function} callback - (Optional) Function to call after the message hides.
  */
-
 function showMessage(message, type = "info", duration = 3000, callback = null) {
     const toastContainer = document.getElementById('toast-container');
 
