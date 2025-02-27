@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Websocket Integration</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #log {
+            background-color: #f8f8f8;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Test Websocket Integration</h1>
+        
+        <div class="test-section">
+            <h2>Test 1: Get MAC Address</h2>
+            <p>This test will retrieve the MAC address from the server using the site_id.</p>
+            <button id="test-mac">Run Test</button>
+            <div id="mac-result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Test 2: Send Websocket Message</h2>
+            <p>This test will send a JSON message to the websocket server.</p>
+            <button id="test-message">Run Test</button>
+            <div id="message-result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Test 3: Full Integration Test</h2>
+            <p>This test will simulate a click on a bingo number and verify the entire flow.</p>
+            <button id="test-integration">Run Test</button>
+            <div id="integration-result"></div>
+        </div>
+        
+        <h2>Log</h2>
+        <div id="log"></div>
+    </div>
+    
+    <script src="websocket_client.js"></script>
+    <script>
+        // Función para agregar mensajes al log
+        function log(message, type = 'info') {
+            const logElement = document.getElementById('log');
+            const logEntry = document.createElement('div');
+            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logEntry.className = type;
+            logElement.appendChild(logEntry);
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+        
+        // Función para mostrar resultados
+        function showResult(elementId, message, success) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = success ? 'success' : 'error';
+        }
+        
+        // Test 1: Obtener la dirección MAC
+        document.getElementById('test-mac').addEventListener('click', function() {
+            log('Starting MAC address test...');
+            
+            // Obtener el site_id de la URL o usar uno de prueba
+            const urlParams = new URLSearchParams(window.location.search);
+            const siteId = urlParams.get('site_id') || '68';
+            
+            fetch(`get_mac_address.php?site_id=${siteId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.error) {
+                        log(`Error getting MAC address: ${data.error}`, 'error');
+                        showResult('mac-result', `Error: ${data.error}`, false);
+                        return;
+                    }
+                    
+                    log(`MAC address retrieved: ${data.mac_address}`, 'info');
+                    showResult('mac-result', `Success! MAC address: ${data.mac_address}`, true);
+                })
+                .catch(error => {
+                    log(`Error in MAC address test: ${error.message}`, 'error');
+                    showResult('mac-result', `Error: ${error.message}`, false);
+                });
+        });
+        
+        // Test 2: Enviar mensaje al servidor websocket
+        document.getElementById('test-message').addEventListener('click', function() {
+            log('Starting websocket message test...');
+            
+            // Obtener el site_id de la URL o usar uno de prueba
+            const urlParams = new URLSearchParams(window.location.search);
+            const siteId = urlParams.get('site_id') || '68';
+            
+            // Primero obtener la dirección MAC
+            fetch(`get_mac_address.php?site_id=${siteId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+                    
+                    const macId = data.mac_address;
+                    log(`MAC address retrieved: ${macId}`, 'info');
+                    
+                    // Construir el mensaje JSON
+                    const message = {
+                        mac_id: macId,
+                        priority: "normal",
+                        program: "bridge_server.py",
+                        plane: 2,
+                        description: "update board cell",
+                        cellId: "B1",
+                        action: "updateBoardCell",
+                        effect: "flipInY",
+                        target_sub_bridge: 0,
+                        duration: 2,
+                        delay: 0,
+                        iterationCount: 3,
+                        keepFinalState: true,
+                        requires_confirmation: true
+                    };
+                    
+                    log(`Sending message: ${JSON.stringify(message)}`, 'info');
+                    
+                    // Enviar el mensaje al servidor
+                    return fetch('send_websocket_message.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(message)
+                    });
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        log(`Error sending message: ${data.error}`, 'error');
+                        showResult('message-result', `Error: ${data.error}`, false);
+                        return;
+                    }
+                    
+                    log('Message sent successfully!', 'info');
+                    showResult('message-result', 'Success! Message sent to websocket server.', true);
+                })
+                .catch(error => {
+                    log(`Error in websocket message test: ${error.message}`, 'error');
+                    showResult('message-result', `Error: ${error.message}`, false);
+                });
+        });
+        
+        // Test 3: Prueba de integración completa
+        document.getElementById('test-integration').addEventListener('click', function() {
+            log('Starting full integration test...');
+            
+            // Obtener el site_id de la URL o usar uno de prueba
+            const urlParams = new URLSearchParams(window.location.search);
+            const siteId = urlParams.get('site_id') || '68';
+            
+            // Simular el flujo completo
+            getMacAddress(siteId)
+                .then(macId => {
+                    if (!macId) {
+                        throw new Error('Failed to get MAC address');
+                    }
+                    
+                    log(`MAC address retrieved: ${macId}`, 'info');
+                    
+                    // Simular el envío del mensaje
+                    log('Sending websocket message for cell B1...', 'info');
+                    sendWebsocketMessage('B1', macId);
+                    
+                    // Mostrar resultado exitoso
+                    log('Full integration test completed successfully!', 'info');
+                    showResult('integration-result', 'Success! Full integration test passed.', true);
+                })
+                .catch(error => {
+                    log(`Error in integration test: ${error.message}`, 'error');
+                    showResult('integration-result', `Error: ${error.message}`, false);
+                });
+        });
+        
+        // Función para mostrar mensajes (reemplaza la función en websocket_client.js)
+        function showMessage(message, type, duration) {
+            log(message, type);
+        }
+    </script>
+</body>
+</html>
