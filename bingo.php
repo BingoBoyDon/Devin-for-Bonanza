@@ -1,4 +1,3 @@
-
 <?php
 session_start();
 
@@ -247,7 +246,9 @@ pg_close($dbconn);
             }
         })();
     </script>
-    <!-- Incluir script.js primero -->
+    <!-- Incluir websocket_client.js primero -->
+    <script src="websocket_client.js"></script>
+    <!-- Incluir script.js después -->
     <script src="script.js"></script>
     <!-- Incluir previous-games.js después de script.js -->
     <script src="previous-games.js"></script>
