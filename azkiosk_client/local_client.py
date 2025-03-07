@@ -329,8 +329,37 @@ def listen_for_commands(client_id):
             print(f"Error al recibir códigos de comando: {e}")
             time.sleep(5)
 
+def send_error_confirmation(stub, client_id, adjustment_id, error_message, error_balance_value):
+    """Envía una confirmación de error al servidor con el mensaje de error."""
+    # Extraer información específica del error para categorización
+    error_type = "Unknown Error"
+    if "Account not found" in error_message:
+        error_type = "Account Not Found"
+    elif "Connection reset by peer" in error_message:
+        error_type = "Connection Reset"
+    elif "Account is currently in use" in error_message:
+        error_type = "Account In Use"
+    
+    print(f"Enviando confirmación de error al servidor. Tipo: {error_type}, ID: {adjustment_id}, Mensaje: {error_message}")
+    
+    # Enviar confirmación al servidor con valores especiales para indicar error
+    confirm_req = test_pb2.BalanceAdjustmentConfirmation(
+        client_id=client_id,
+        adjustment_id=adjustment_id,
+        previous_balance=error_balance_value,
+        new_balance=error_balance_value
+    )
+    try:
+        confirm_resp = stub.ConfirmBalanceAdjustment(confirm_req)
+        print(f"Confirmación de error recibida: {confirm_resp.message}")
+    except grpc.RpcError as e:
+        print(f"Error enviando confirmación de error: {e.details()}")
+
 def listen_for_balance_adjustments(client_id):
     """Escucha solicitudes de ajuste de balance, ejecuta el ajuste y envía la confirmación con ambos balances."""
+    # Valor especial para indicar error en los balances
+    ERROR_BALANCE_VALUE = -1
+    
     channel = grpc.insecure_channel(f'{server_ip}:{server_port}', options=CHANNEL_OPTIONS)
     stub = test_pb2_grpc.TestServiceStub(channel)
     request = test_pb2.BalanceAdjustmentQuery(client_id=client_id)
@@ -354,7 +383,10 @@ def listen_for_balance_adjustments(client_id):
                 try:
                     result = subprocess.run(args, capture_output=True, text=True)
                 except Exception as e:
-                    print(f"Error ejecutando balance_adjustment_client.py: {e}")
+                    error_message = f"Error ejecutando balance_adjustment_client.py: {e}"
+                    print(error_message)
+                    # Enviar confirmación de error al servidor
+                    send_error_confirmation(stub, client_id, adjustment_request.adjustment_id, error_message, ERROR_BALANCE_VALUE)
                     continue
 
                 # Mostrar datos de depuración para verificar la salida
@@ -370,7 +402,10 @@ def listen_for_balance_adjustments(client_id):
                         previous_balance = data["previous_balance"]
                         new_balance = data["new_balance"]
                     except Exception as e:
-                        print(f"Error al parsear el output: {e}")
+                        error_message = f"Error al parsear el output: {e}"
+                        print(error_message)
+                        # Enviar confirmación de error al servidor
+                        send_error_confirmation(stub, client_id, adjustment_request.adjustment_id, error_message, ERROR_BALANCE_VALUE)
                         continue
                     print(f"Ajuste completado. Balance inicial: {previous_balance} cents, Nuevo balance: {new_balance} cents")
 
@@ -387,7 +422,11 @@ def listen_for_balance_adjustments(client_id):
                     except grpc.RpcError as e:
                         print(f"Error enviando confirmación: {e.details()}")
                 else:
-                    print(f"Error en balance_adjustment_client.py: {result.stderr}")
+                    # Extraer el mensaje de error del stderr
+                    error_message = result.stderr.strip()
+                    print(f"Error en balance_adjustment_client.py: {error_message}")
+                    # Enviar confirmación de error al servidor
+                    send_error_confirmation(stub, client_id, adjustment_request.adjustment_id, error_message, ERROR_BALANCE_VALUE)
         except grpc.RpcError as e:
             print(f"Error en stream de ajustes: {e}")
             time.sleep(5)
