@@ -512,12 +512,13 @@ class TestServiceServicer(test_pb2_grpc.TestServiceServicer):
         logger.info(f"Received balance adjustment request for client {client_id}")
         
         # Aquí se procesaría la solicitud de ajuste de balance
-        # Por ejemplo, guardarla en la base de datos
+        # Ahora usando balance_db_updater.py en lugar de acceso directo a la base de datos
         
         return test_pb2.BalanceAdjustmentResponse(
             message="Balance adjustment request received",
             success=True,
             updated_balance=0  # Este valor se actualizará cuando se complete el ajuste
+        )
         )
     
     def StreamBalanceAdjustment(self, request, context):
