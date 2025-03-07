@@ -1,0 +1,126 @@
+syntax = "proto3";
+
+service TestService {
+    // El servidor cloud espera que el cliente se conecte mediante streaming
+    rpc Connect (stream ConnectionRequest) returns (stream ConnectionResponse);
+
+    // Streaming desde el servidor para enviar números de bingo de manera proactiva
+    rpc StreamBingoNumbers (BingoNumbersRequest) returns (stream BingoNumbersResponse);
+
+    // Recibe números de bingo desde draw_processor.py
+    rpc ReceiveBingoNumbers (BingoNumbersRequest) returns (BingoNumbersResponse);
+
+    // Confirmación de recepción de números de bingo (método unary)
+    rpc ConfirmReceipt (ConfirmationRequest) returns (ConfirmationResponse);
+
+    // Envío de mensajes genéricos como "heartbeat" o "ping"
+    rpc SendMessage (MessageRequest) returns (MessageResponse);
+
+    // Método para que el cliente solicite las llaves
+    rpc GetKeys (KeyFilesRequest) returns (KeyFilesResponse);
+
+    rpc GetBingoImages (ImageRequest) returns (stream ImageResponse);
+
+    rpc StreamCommandCodes (CommandRequest) returns (stream CommandResponse);
+
+    // Nuevos métodos para ajuste de balances:
+    rpc SendBalanceAdjustmentRequest(BalanceAdjustmentRequest) returns (BalanceAdjustmentResponse);
+    rpc StreamBalanceAdjustment(BalanceAdjustmentQuery) returns (stream BalanceAdjustmentRequest);
+    rpc ConfirmBalanceAdjustment(BalanceAdjustmentConfirmation) returns (BalanceAdjustmentResponse);
+}
+
+message ConnectionRequest {
+    string client_id = 1;
+    string public_ip = 2;
+    string mac_address = 3;
+}
+
+message ConnectionResponse {
+    string message = 1;
+}
+
+message KeyFilesRequest {
+    string client_id = 1; // Identificador del cliente
+}
+
+message KeyFilesResponse {
+    bytes host_keys = 1;   // Archivo tar.gz que contiene todas las llaves
+    string message = 2;    // Mensaje de estado
+}
+
+message BingoNumbersRequest {
+    string client_id = 1;
+    repeated int32 numbers = 2;      // Array de números de bingo
+    int32 draw_id = 3;               // Nuevo campo para identificar el sorteo
+}
+
+message BingoNumbersResponse {
+    string message = 1;
+    repeated int32 numbers = 2;      // Array de números de bingo
+    int32 draw_id = 3;               // Nuevo campo para identificar el sorteo
+}
+
+message ConfirmationRequest {
+    string client_id = 1;
+    bool success = 2;                // Indica éxito o fallo
+    string details = 3;              // Opcional: detalles adicionales
+    int32 draw_id = 4;               // Nuevo campo para identificar el sorteo
+}
+
+message ConfirmationResponse {
+    string message = 1;
+}
+
+message MessageRequest {
+    string client_id = 1;
+    string message = 2;
+}
+
+message MessageResponse {
+    string message = 1;
+}
+
+message ImageRequest {
+    string client_id = 1;
+}
+
+message ImageResponse {
+    string image_name = 1;
+    bytes image_data = 2;
+}
+
+message CommandRequest {
+    string client_id = 1;
+}
+
+message CommandResponse {
+    int32 command_code = 1;
+    string sent_at = 2;
+}
+
+message BalanceAdjustmentRequest {
+    string client_id = 1;
+    int32 costumers_id = 2;
+    int32 adjustment_id = 3;
+    int32 adjustment_requested_amount = 4;
+    string phone_number = 5;
+}
+
+message BalanceAdjustmentResponse {
+    string message = 1;
+    bool success = 2;
+    int32 updated_balance = 3;
+}
+
+message BalanceAdjustmentConfirmation {
+    string client_id = 1;
+    int32 adjustment_id = 2;
+    int32 previous_balance = 3;
+    int32 new_balance = 4;
+    int32 transaction_id = 5;  // ID de la transacción generada por el sistema
+    int32 error_code = 6;      // Código de error (0 = sin error, -1 a -5 para diferentes tipos de errores)
+}
+
+message BalanceAdjustmentQuery {
+    string client_id = 1;
+}
