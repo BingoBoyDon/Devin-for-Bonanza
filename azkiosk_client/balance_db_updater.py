@@ -70,28 +70,77 @@ def update_balance_adjustment(adjustment_id, previous_balance, new_balance, tran
         logger.error(f"Error actualizando balance_adjustments: {e}")
         return False
 
+def get_pending_adjustments(client_id):
+    """
+    Consulta los ajustes de balance pendientes para un cliente específico.
+    
+    Args:
+        client_id (str): MAC address del cliente
+    
+    Returns:
+        list: Lista de diccionarios con los ajustes pendientes (id, costumers_id, amount, phone_number)
+    """
+    try:
+        conn = psycopg2.connect(**DB_CONFIG)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT ba.id, ba.costumers_id, ba.amount, c.phone_number
+            FROM balance_adjustments ba
+            JOIN costumers c ON ba.costumers_id = c.id
+            JOIN clients cl ON c.client_id = cl.id
+            WHERE cl.mac_address = %s AND ba.waiting_processes = TRUE
+            LIMIT 1
+        """, (client_id,))
+        
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if result:
+            return [{"id": result[0], "costumers_id": result[1], "amount": result[2], "phone_number": result[3]}]
+        else:
+            return []
+    except Exception as e:
+        logger.error(f"Error consultando ajustes pendientes: {e}")
+        return []
+
 def main():
     """
-    Función principal que lee los datos de entrada y actualiza la base de datos.
-    Espera un JSON con los campos: adjustment_id, previous_balance, new_balance, transaction_id
+    Función principal que lee los datos de entrada y realiza la operación correspondiente.
+    Espera un JSON con los campos necesarios según la operación:
+    - Para actualizar balance: adjustment_id, previous_balance, new_balance, transaction_id
+    - Para consultar ajustes pendientes: client_id, command="get_pending"
     """
     try:
         # Leer datos de entrada (JSON)
         input_data = sys.stdin.read().strip()
         data = json.loads(input_data)
         
-        # Extraer los campos necesarios
-        adjustment_id = data.get('adjustment_id')
-        previous_balance = data.get('previous_balance')
-        new_balance = data.get('new_balance')
-        transaction_id = data.get('transaction_id', 0)
+        # Determinar la operación a realizar
+        command = data.get('command', 'update')
         
-        # Actualizar la base de datos
-        success = update_balance_adjustment(adjustment_id, previous_balance, new_balance, transaction_id)
-        
-        # Devolver resultado
-        result = {"success": success}
-        print(json.dumps(result))
+        if command == 'get_pending':
+            # Consultar ajustes pendientes
+            client_id = data.get('client_id')
+            if not client_id:
+                print(json.dumps({"success": False, "error": "Client ID is required"}))
+                return
+            
+            adjustments = get_pending_adjustments(client_id)
+            print(json.dumps({"success": True, "adjustments": adjustments}))
+        else:
+            # Actualizar balance (comportamiento original)
+            adjustment_id = data.get('adjustment_id')
+            previous_balance = data.get('previous_balance')
+            new_balance = data.get('new_balance')
+            transaction_id = data.get('transaction_id', 0)
+            
+            # Actualizar la base de datos
+            success = update_balance_adjustment(adjustment_id, previous_balance, new_balance, transaction_id)
+            
+            # Devolver resultado
+            print(json.dumps({"success": success}))
     except Exception as e:
         logger.error(f"Error en el procesamiento de datos: {e}")
         print(json.dumps({"success": False, "error": str(e)}))
