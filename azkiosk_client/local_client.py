@@ -362,12 +362,11 @@ def send_error_confirmation(stub, client_id, adjustment_id, error_message, trans
         client_id=client_id,
         adjustment_id=adjustment_id,
         previous_balance=error_code,
-        new_balance=error_code,
-        transaction_id=transaction_id if transaction_id else 0
+        new_balance=error_code
     )
     try:
         confirm_resp = stub.ConfirmBalanceAdjustment(confirm_req)
-        print(f"Confirmación de error recibida: {confirm_resp.message}")
+        print(f"Confirmación de error recibida: {confirm_resp.message}, Transaction ID: {transaction_id if transaction_id else 0}")
     except grpc.RpcError as e:
         print(f"Error enviando confirmación de error: {e.details()}")
 
@@ -437,12 +436,12 @@ def listen_for_balance_adjustments(client_id):
                         client_id=client_id,
                         adjustment_id=adjustment_request.adjustment_id,
                         previous_balance=previous_balance,
-                        new_balance=new_balance,
-                        transaction_id=transaction_id
+                        new_balance=new_balance
                     )
+                    print(f"Enviando confirmación al servidor: AdjustmentID: {adjustment_request.adjustment_id}, Balance Inicial: {previous_balance}, Nuevo Balance: {new_balance}, Transaction ID: {transaction_id}")
                     try:
                         confirm_resp = stub.ConfirmBalanceAdjustment(confirm_req)
-                        print(f"Confirmación recibida: {confirm_resp.message}")
+                        print(f"Confirmación recibida: {confirm_resp.message}, Transaction ID: {transaction_id}")
                     except grpc.RpcError as e:
                         print(f"Error enviando confirmación: {e.details()}")
                 else:
