@@ -8,6 +8,7 @@ import test_pb2
 import test_pb2_grpc
 import subprocess
 import configparser
+import re
 from concurrent.futures import ThreadPoolExecutor
 import os
 import pwd
@@ -329,25 +330,40 @@ def listen_for_commands(client_id):
             print(f"Error al recibir códigos de comando: {e}")
             time.sleep(5)
 
-def send_error_confirmation(stub, client_id, adjustment_id, error_message, error_balance_value):
+def send_error_confirmation(stub, client_id, adjustment_id, error_message, transaction_id=None):
     """Envía una confirmación de error al servidor con el mensaje de error."""
-    # Extraer información específica del error para categorización
+    # Códigos de error específicos para diferentes tipos de errores
+    # -1: Account not found
+    # -2: Connection reset by peer
+    # -3: No route to host
+    # -4: Unknown error
+    # -5: Account in use
+    
+    error_code = -4  # Default: Unknown error
     error_type = "Unknown Error"
+    
     if "Account not found" in error_message:
+        error_code = -1
         error_type = "Account Not Found"
     elif "Connection reset by peer" in error_message:
+        error_code = -2
         error_type = "Connection Reset"
+    elif "No route to host" in error_message:
+        error_code = -3
+        error_type = "No Route to Host"
     elif "Account is currently in use" in error_message:
+        error_code = -5
         error_type = "Account In Use"
     
-    print(f"Enviando confirmación de error al servidor. Tipo: {error_type}, ID: {adjustment_id}, Mensaje: {error_message}")
+    print(f"Enviando confirmación de error al servidor. Tipo: {error_type}, Código: {error_code}, ID: {adjustment_id}, Mensaje: {error_message}")
     
-    # Enviar confirmación al servidor con valores especiales para indicar error
+    # Enviar confirmación al servidor con valores específicos para cada tipo de error
     confirm_req = test_pb2.BalanceAdjustmentConfirmation(
         client_id=client_id,
         adjustment_id=adjustment_id,
-        previous_balance=error_balance_value,
-        new_balance=error_balance_value
+        previous_balance=error_code,
+        new_balance=error_code,
+        transaction_id=transaction_id if transaction_id else 0
     )
     try:
         confirm_resp = stub.ConfirmBalanceAdjustment(confirm_req)
@@ -357,8 +373,6 @@ def send_error_confirmation(stub, client_id, adjustment_id, error_message, error
 
 def listen_for_balance_adjustments(client_id):
     """Escucha solicitudes de ajuste de balance, ejecuta el ajuste y envía la confirmación con ambos balances."""
-    # Valor especial para indicar error en los balances
-    ERROR_BALANCE_VALUE = -1
     
     channel = grpc.insecure_channel(f'{server_ip}:{server_port}', options=CHANNEL_OPTIONS)
     stub = test_pb2_grpc.TestServiceStub(channel)
@@ -386,7 +400,7 @@ def listen_for_balance_adjustments(client_id):
                     error_message = f"Error ejecutando balance_adjustment_client.py: {e}"
                     print(error_message)
                     # Enviar confirmación de error al servidor
-                    send_error_confirmation(stub, client_id, adjustment_request.adjustment_id, error_message, ERROR_BALANCE_VALUE)
+                    send_error_confirmation(stub, client_id, adjustment_request.adjustment_id, error_message)
                     continue
 
                 # Mostrar datos de depuración para verificar la salida
@@ -401,11 +415,20 @@ def listen_for_balance_adjustments(client_id):
                         # Obtener el balance inicial y final del JSON devuelto por balance_adjustment_client.py
                         previous_balance = data["previous_balance"]
                         new_balance = data["new_balance"]
+                        
+                        # Extraer el Transaction ID del stderr si está disponible
+                        transaction_id = 0
+                        stderr_output = result.stderr.strip()
+                        transaction_id_match = re.search(r'Transaction ID: ([-\d]+)', stderr_output)
+                        if transaction_id_match:
+                            transaction_id = int(transaction_id_match.group(1))
+                            print(f"Transaction ID extraído: {transaction_id}")
+                        
                     except Exception as e:
                         error_message = f"Error al parsear el output: {e}"
                         print(error_message)
                         # Enviar confirmación de error al servidor
-                        send_error_confirmation(stub, client_id, adjustment_request.adjustment_id, error_message, ERROR_BALANCE_VALUE)
+                        send_error_confirmation(stub, client_id, adjustment_request.adjustment_id, error_message)
                         continue
                     print(f"Ajuste completado. Balance inicial: {previous_balance} cents, Nuevo balance: {new_balance} cents")
 
@@ -414,7 +437,8 @@ def listen_for_balance_adjustments(client_id):
                         client_id=client_id,
                         adjustment_id=adjustment_request.adjustment_id,
                         previous_balance=previous_balance,
-                        new_balance=new_balance
+                        new_balance=new_balance,
+                        transaction_id=transaction_id
                     )
                     try:
                         confirm_resp = stub.ConfirmBalanceAdjustment(confirm_req)
@@ -426,7 +450,7 @@ def listen_for_balance_adjustments(client_id):
                     error_message = result.stderr.strip()
                     print(f"Error en balance_adjustment_client.py: {error_message}")
                     # Enviar confirmación de error al servidor
-                    send_error_confirmation(stub, client_id, adjustment_request.adjustment_id, error_message, ERROR_BALANCE_VALUE)
+                    send_error_confirmation(stub, client_id, adjustment_request.adjustment_id, error_message)
         except grpc.RpcError as e:
             print(f"Error en stream de ajustes: {e}")
             time.sleep(5)
