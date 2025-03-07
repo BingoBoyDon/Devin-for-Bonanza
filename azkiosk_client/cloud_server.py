@@ -519,7 +519,6 @@ class TestServiceServicer(test_pb2_grpc.TestServiceServicer):
             success=True,
             updated_balance=0  # Este valor se actualizará cuando se complete el ajuste
         )
-        )
     
     def StreamBalanceAdjustment(self, request, context):
         client_id = request.client_id
